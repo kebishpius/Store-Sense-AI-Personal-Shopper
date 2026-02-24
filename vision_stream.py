@@ -7,7 +7,7 @@ and yields ready-to-send Blob objects at a target 1 FPS.
 
 Design goals
 ------------
-* 720p native capture  — enough resolution to read barcodes & nutrition facts
+* 720p native capture  — enough resolution to read shelf tags, prices & labels
 * 1 FPS send rate      — preserves Live API bandwidth budget
 * Sharpening pass      — raises contrast on fine text before encoding
 * Plug-and-play        — drop into any async caller via `async for blob in frame_stream()`
