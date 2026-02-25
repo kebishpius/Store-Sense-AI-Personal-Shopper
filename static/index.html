@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Store-Sense — AI Shopping Assistant</title>
+    <meta
+      name="description"
+      content="Real-time AI shopping assistant powered by Gemini Live API"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <!-- ─── Top Bar ─── -->
+    <header id="topbar">
+      <div class="topbar-left">
+        <div class="logo">
+          <span class="logo-icon">🛒</span>
+          <h1>Store-Sense</h1>
+        </div>
+        <span class="badge" id="status-badge">Disconnected</span>
+      </div>
+      <div class="topbar-right">
+        <div class="store-input-group">
+          <label for="store-name">Store</label>
+          <input
+            type="text"
+            id="store-name"
+            placeholder="e.g. Walmart"
+            autocomplete="off"
+          />
+        </div>
+        <div class="mode-selector">
+          <label>Response</label>
+          <div class="toggle-group" id="response-mode">
+            <button
+              class="toggle-btn"
+              data-mode="voice"
+              title="Voice responses"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path
+                  d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"
+                ></path>
+              </svg>
+            </button>
+            <button
+              class="toggle-btn active"
+              data-mode="both"
+              title="Voice + text responses"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+              </svg>
+              <span>+T</span>
+            </button>
+            <button
+              class="toggle-btn"
+              data-mode="text"
+              title="Text-only responses"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+                ></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ─── Main Layout ─── -->
+    <main id="app">
+      <!-- Camera Panel -->
+      <section id="camera-panel" class="glass-card">
+        <div class="panel-header">
+          <h2>Camera Feed</h2>
+          <div class="camera-stats">
+            <span id="local-fps" class="stat">-- FPS</span>
+            <span class="stat-divider">|</span>
+            <span id="send-fps" class="stat">1 FPS to AI</span>
+          </div>
+        </div>
+        <div class="camera-container">
+          <video id="camera-video" autoplay muted playsinline></video>
+          <canvas id="capture-canvas" style="display: none"></canvas>
+          <div class="camera-overlay" id="camera-overlay">
+            <p>Click to enable camera</p>
+          </div>
+        </div>
+        <!-- Mic Control -->
+        <div class="mic-controls">
+          <button id="mic-btn" class="mic-button" title="Toggle microphone">
+            <div class="mic-ring"></div>
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"
+              ></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+              <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+          </button>
+          <span id="mic-status" class="mic-label">Mic off</span>
+        </div>
+      </section>
+
+      <!-- Chat Panel -->
+      <section id="chat-panel" class="glass-card">
+        <div class="panel-header">
+          <h2>Conversation</h2>
+          <button id="clear-chat" class="icon-btn" title="Clear chat">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path
+                d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+              ></path>
+            </svg>
+          </button>
+        </div>
+        <div id="chat-messages" class="chat-messages">
+          <div class="message system-msg">
+            <p>
+              Welcome to <strong>Store-Sense</strong>! Enable your camera and
+              point it at a product to get started.
+            </p>
+          </div>
+        </div>
+        <div class="chat-input-bar">
+          <input
+            type="text"
+            id="chat-input"
+            placeholder="Type a message..."
+            autocomplete="off"
+          />
+          <button id="send-btn" class="send-button" title="Send message">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <!-- ─── Product Log Sidebar (slides in on tool calls) ─── -->
+    <aside id="product-log" class="glass-card">
+      <div class="panel-header">
+        <h2>Product Log</h2>
+        <button id="close-log" class="icon-btn" title="Close">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div id="product-entries" class="product-entries"></div>
+    </aside>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

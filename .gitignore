@@ -1,4 +1,8 @@
 .venv/
+myenv/
 __pycache__/
 *.pyc
 .gemini/
+google-cloud-sdk/
+*.json
+!requirements.txt

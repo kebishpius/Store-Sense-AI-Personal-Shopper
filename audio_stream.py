@@ -1,7 +1,7 @@
 """
 audio_stream.py — Store-Sense Native Audio Engine
 ==================================================
-Handles all real-time audio I/O for the Live session:
+Handles all real-time audio I/O for the Live Shopping Assistant session:
 
   MIC  →  16 kHz mono int16 PCM  →  Gemini Live API
   Gemini Live API  →  24 kHz mono int16 PCM  →  Speaker
