@@ -1,0 +1,27 @@
+steps:
+  # 1. Build the container image
+  - name: "gcr.io/cloud-builders/docker"
+    args: ["build", "-t", "gcr.io/$PROJECT_ID/store-sense", "."]
+
+  # 2. Push the container image to Container Registry (GCR)
+  # Note: If you prefer Artifact Registry (AR), replace 'gcr.io' with 'us-central1-docker.pkg.dev'
+  - name: "gcr.io/cloud-builders/docker"
+    args: ["push", "gcr.io/$PROJECT_ID/store-sense"]
+
+  # 3. Deploy container image to Cloud Run
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "store-sense-backend"
+      - "--image"
+      - "gcr.io/$PROJECT_ID/store-sense"
+      - "--region"
+      - "us-central1"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "8080"
+
+images:
+  - "gcr.io/$PROJECT_ID/store-sense"

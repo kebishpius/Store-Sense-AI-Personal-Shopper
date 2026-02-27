@@ -239,13 +239,8 @@ async def websocket_endpoint(ws: WebSocket):
     # Build Gemini session config
     client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION)
 
-    response_modalities = []
-    if response_mode in ("voice", "both"):
-        response_modalities.append("AUDIO")
-    if response_mode in ("text", "both"):
-        response_modalities.append("TEXT")
-    if not response_modalities:
-        response_modalities = ["AUDIO"]
+    response_modalities = ["TEXT"] if response_mode == "text" else ["AUDIO"]
+    output_audio_transcription = {} if response_mode in ("voice", "both") else None
 
     tools = [
         types.Tool(google_search=types.GoogleSearch()),
@@ -258,6 +253,7 @@ async def websocket_endpoint(ws: WebSocket):
             parts=[types.Part(text=_build_system_prompt(store_name, response_mode))]
         ),
         tools=tools,
+        output_audio_transcription=output_audio_transcription,
     )
 
     print(f"[ws] Connecting to {MODEL} ...")
@@ -293,6 +289,13 @@ async def websocket_endpoint(ws: WebSocket):
                             await ws.send_json({
                                 "type": "text",
                                 "text": response.text,
+                            })
+
+                        # Transcription data for AUDIO + TEXT mode
+                        if server_content and getattr(server_content, "output_transcription", None):
+                            await ws.send_json({
+                                "type": "text",
+                                "text": server_content.output_transcription.text,
                             })
 
                         # Function calls

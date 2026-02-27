@@ -277,6 +277,7 @@ async def run_live_session(store_name: str = "") -> None:
             parts=[types.Part(text=system_prompt)]
         ),
         tools=tools,
+        output_audio_transcription={},
     )
 
     print(f"[Store-Sense] Connecting to {MODEL} ...")
@@ -305,6 +306,9 @@ async def run_live_session(store_name: str = "") -> None:
 
                         if response.text:
                             print(f"[model] {response.text}")
+
+                        if server_content and getattr(server_content, "output_transcription", None):
+                            print(f"[model transcript] {server_content.output_transcription.text}")
 
                         if server_content:
                             model_turn = getattr(server_content, "model_turn", None)
