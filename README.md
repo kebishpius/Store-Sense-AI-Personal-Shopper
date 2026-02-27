@@ -69,16 +69,53 @@ Then:
 4. **Type a message** or **click the mic button** to talk
 5. **Point your camera** at a product — the AI will read prices, log them, and compare across stores
 
+## Deployment to Google Cloud (Cloud Run)
+
+Store-Sense is a unified FastAPI app—the **backend API** and the **frontend UI** are served together. Hosting it on Google Cloud Run deploys the entire application.
+
+1. **Authenticate and set project**:
+
+```bash
+gcloud auth login
+gcloud config set project hackathons-461900
+```
+
+2. **Enable APIs**:
+
+```bash
+gcloud services enable cloudbuild.googleapis.com run.googleapis.com containerregistry.googleapis.com
+```
+
+3. **Deploy (UI + Backend)**:
+
+```bash
+gcloud builds submit --config cloudbuild.yaml .
+```
+
+4. **Grant permissions**:
+   Cloud Run uses the default compute service account which requires Vertex AI and Datastore permissions.
+
+```bash
+PROJECT_NUM=$(gcloud projects describe hackathons-461900 --format="value(projectNumber)")
+gcloud projects add-iam-policy-binding hackathons-461900 \
+    --member="serviceAccount:$PROJECT_NUM-compute@developer.gserviceaccount.com" \
+    --role="roles/aiplatform.user"
+gcloud projects add-iam-policy-binding hackathons-461900 \
+    --member="serviceAccount:$PROJECT_NUM-compute@developer.gserviceaccount.com" \
+    --role="roles/datastore.user"
+```
+
 ## Project Structure
 
-| File                | Purpose                                                     |
+105:
+| File | Purpose |
 | ------------------- | ----------------------------------------------------------- |
-| `main.py`           | Entry point — launches FastAPI via uvicorn                  |
-| `server.py`         | FastAPI WebSocket relay between browser and Gemini Live API |
-| `product_db.py`     | Firestore database for product & price tracking             |
-| `static/index.html` | Single-page UI layout                                       |
-| `static/styles.css` | Dark glassmorphism theme                                    |
-| `static/app.js`     | WebSocket, camera, mic/speaker, chat, product log logic     |
-| `live_session.py`   | Standalone CLI session (legacy, pre-web-UI)                 |
-| `vision_stream.py`  | OpenCV webcam capture (legacy, pre-web-UI)                  |
-| `audio_stream.py`   | Sounddevice audio engine (legacy, pre-web-UI)               |
+| `main.py` | Entry point — launches FastAPI via uvicorn |
+| `server.py` | FastAPI WebSocket relay between browser and Gemini Live API |
+| `product_db.py` | Firestore database for product & price tracking |
+| `static/index.html` | Single-page UI layout |
+| `static/styles.css` | Dark glassmorphism theme |
+| `static/app.js` | WebSocket, camera, mic/speaker, chat, product log logic |
+| `live_session.py` | Standalone CLI session (legacy, pre-web-UI) |
+| `vision_stream.py` | OpenCV webcam capture (legacy, pre-web-UI) |
+| `audio_stream.py` | Sounddevice audio engine (legacy, pre-web-UI) |
