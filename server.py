@@ -15,26 +15,69 @@ import asyncio
 import base64
 import json
 import traceback
+import google.auth
+from dotenv import load_dotenv
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+# Load environment variables from .env
+load_dotenv()
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from google import genai
 from google.genai import types
 from product_db import log_product, query_price_history
 
+import logging
+logging.basicConfig(filename='server_debug.log', level=logging.DEBUG, 
+                    format='%(asctime)s %(levelname)s %(message)s')
+logging.info("Server script starting...")
+
 # ─────────────────────────────────────────────
 # Configuration
 # ─────────────────────────────────────────────
-PROJECT_ID = "hackathons-461900"
-LOCATION   = "us-central1"
-MODEL      = "gemini-live-2.5-flash-native-audio"
+import os
+import vertexai
+from vertexai.generative_models import GenerativeModel, Part
+
+PROJECT_ID = os.environ.get("PROJECT_ID", "hackathons-461900")
+LOCATION   = os.environ.get("LOCATION", "us-central1")
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
+
+# Use gemini-2.0-flash for the Live API (must have "live" capability)
+MODEL = "gemini-2.0-flash-live-001"
+
+os.environ["GOOGLE_CLOUD_PROJECT"] = PROJECT_ID
+os.environ["GOOGLE_CLOUD_LOCATION"] = LOCATION
+
+def _make_genai_client():
+    """Create a genai Client. Prefer GOOGLE_API_KEY (no blocking ADC call).
+    Falls back to Vertex AI + Application Default Credentials."""
+    if GOOGLE_API_KEY:
+        print(f"[auth] Using GOOGLE_API_KEY (Gemini AI Studio mode)")
+        return genai.Client(api_key=GOOGLE_API_KEY)
+    else:
+        print(f"[auth] No GOOGLE_API_KEY — trying Vertex AI ADC...")
+        import google.auth as _gauth
+        import vertexai as _vtx
+        creds, _ = _gauth.default()
+        _vtx.init(project=PROJECT_ID, location=LOCATION, credentials=creds)
+        return genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION, credentials=creds)
 
 MIC_SAMPLE_RATE = 16_000
 SPK_SAMPLE_RATE = 24_000
 
 app = FastAPI(title="Store-Sense")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ─────────────────────────────────────────────
@@ -214,6 +257,46 @@ async def _dispatch_function_call(gemini_session, fc, client_ws: WebSocket):
 
 
 # ─────────────────────────────────────────────
+# POST /analyze Endpoint
+# ─────────────────────────────────────────────
+
+@app.post("/analyze")
+async def analyze_image(image: UploadFile = File(...)):
+    try:
+        # Read uploaded image bytes
+        image_bytes = await image.read()
+        
+        # Prompt for analysis
+        prompt = (
+            "Analyze this product image. Provide the product name, brand, "
+            "estimated price, and inventory status. "
+            "Return ONLY valid JSON with exact keys: 'product_name', 'brand', 'price', 'inventory_status'."
+        )
+        
+        # Use the Vertex AI Client (Google GenAI SDK)
+        client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION, credentials=credentials)
+        
+        response = client.models.generate_content(
+            model=MODEL,
+            contents=[
+                types.Part.from_bytes(data=image_bytes, mime_type=image.content_type),
+                types.Part.from_text(text=prompt)
+            ],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            )
+        )
+        
+        # The response text should be valid JSON
+        parsed_json = json.loads(response.text)
+        return JSONResponse(status_code=200, content=parsed_json)
+        
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+# ─────────────────────────────────────────────
 # WebSocket endpoint
 # ─────────────────────────────────────────────
 
@@ -237,7 +320,8 @@ async def websocket_endpoint(ws: WebSocket):
         print(f"[ws] No config received, using defaults: {e}")
 
     # Build Gemini session config
-    client = genai.Client(vertexai=True, project=PROJECT_ID, location=LOCATION)
+    print(f"[ws] Using PROJECT_ID: {PROJECT_ID}, LOCATION: {LOCATION}, MODEL: {MODEL}")
+    logging.info(f"Using PROJECT_ID: {PROJECT_ID}, LOCATION: {LOCATION}, MODEL: {MODEL}")
 
     response_modalities = ["TEXT"] if response_mode == "text" else ["AUDIO"]
     output_audio_transcription = {} if response_mode in ("voice", "both") else None
@@ -256,11 +340,15 @@ async def websocket_endpoint(ws: WebSocket):
         output_audio_transcription=output_audio_transcription,
     )
 
-    print(f"[ws] Connecting to {MODEL} ...")
 
     try:
+        print(f"[ws] Building Gemini client...")
+        client = await asyncio.get_event_loop().run_in_executor(None, _make_genai_client)
+        print(f"[ws] Client ready. Connecting to Gemini Live session (model={MODEL})...")
+
         async with client.aio.live.connect(model=MODEL, config=live_config) as session:
-            print("[ws] Gemini session ACTIVE")
+            print("[ws] Gemini session ACTIVATED")
+            logging.info(f"Gemini session started successfully for {MODEL} in {LOCATION}")
             await ws.send_json({"type": "status", "message": "connected"})
 
             # ── Receive from Gemini, forward to browser ──────────────
@@ -381,6 +469,9 @@ async def websocket_endpoint(ws: WebSocket):
 
     except Exception as e:
         print(f"[ws] Gemini connection error: {e}")
+        with open("ws_error_log.txt", "a") as f:
+            f.write(f"Gemini connection error: {str(e)}\n")
+            f.write(traceback.format_exc() + "\n")
         traceback.print_exc()
         try:
             await ws.send_json({"type": "error", "message": str(e)})

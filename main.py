@@ -12,6 +12,7 @@ Usage
 
 import argparse
 import uvicorn
+from dotenv import load_dotenv
 
 
 def parse_args():
@@ -21,8 +22,8 @@ def parse_args():
     parser.add_argument(
         "--port",
         type=int,
-        default=8000,
-        help="Port to run the web server on (default: 8000).",
+        default=8001,
+        help="Port to run the web server on (default: 8001).",
     )
     parser.add_argument(
         "--host",
@@ -34,7 +35,8 @@ def parse_args():
 
 
 if __name__ == "__main__":
+    load_dotenv()
     args = parse_args()
     print(f"[Store-Sense] Starting web server at http://localhost:{args.port}")
     print(f"[Store-Sense] Open this URL in your browser to begin.")
-    uvicorn.run("server:app", host=args.host, port=args.port, reload=True)
+    uvicorn.run("server:app", host=args.host, port=args.port, reload=False)

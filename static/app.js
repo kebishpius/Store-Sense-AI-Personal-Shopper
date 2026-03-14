@@ -73,29 +73,26 @@ async function startCamera() {
         cameraVideo.srcObject = cameraStream;
         cameraOverlay.classList.add('hidden');
 
+        // Auto-connect WebSocket as soon as we have a stream
+        connectWebSocket();
+
         // Set canvas to capture resolution
         captureCanvas.width = 640;
         captureCanvas.height = 480;
 
-        // Count local FPS from the video track
-        const track = cameraStream.getVideoTracks()[0];
-        const reader = new MediaStreamTrackProcessor({ track }).readable.getReader();
-        (async () => {
-            while (true) {
-                const { done } = await reader.read();
-                if (done) break;
-                fpsCounter++;
-            }
-        })().catch(() => {});
+        // Simple FPS counter using requestAnimationFrame
+        const countFps = () => {
+            if (!cameraStream) return;
+            fpsCounter++;
+            requestAnimationFrame(countFps);
+        };
+        requestAnimationFrame(countFps);
 
         // Start sending 1 FPS to server
         startFrameSending();
-
-        // Auto-connect WebSocket once camera is ready
-        connectWebSocket();
     } catch (err) {
         console.error('Camera error:', err);
-        addSystemMessage('Camera access denied or not available.');
+        addSystemMessage('Camera access denied or hardware error. You can still use text chat below!');
     }
 }
 
@@ -117,6 +114,13 @@ function startFrameSending() {
             type: 'video_frame',
             data: b64,
         }));
+
+        // Visual feedback for frame sending
+        const sendStat = document.getElementById('send-fps');
+        if (sendStat) {
+            sendStat.style.color = 'var(--accent-cyan)';
+            setTimeout(() => { sendStat.style.color = ''; }, 200);
+        }
     }, 1000); // 1 FPS
 }
 
@@ -126,7 +130,7 @@ function startFrameSending() {
 // ═══════════════════════════════════════════════
 
 function connectWebSocket() {
-    if (ws && ws.readyState === WebSocket.OPEN) return;
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
 
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${proto}//${location.host}/ws`);
@@ -169,6 +173,7 @@ function handleServerMessage(msg) {
             break;
 
         case 'text':
+            hideTypingIndicator();
             addAIMessage(msg.text);
             break;
 
@@ -344,16 +349,25 @@ chatInput.addEventListener('keydown', (e) => {
 function sendChatMessage() {
     const text = chatInput.value.trim();
     if (!text) return;
+
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-        addSystemMessage('Not connected. Enable camera to connect.');
+        if (!ws || ws.readyState === WebSocket.CLOSED) {
+            console.log("[ui] WebSocket not open, attempting to connect before sending...");
+            updateConnStatus(false, 'Connecting...');
+            connectWebSocket();
+            addSystemMessage('Connecting to AI... Please try again in a moment.');
+        } else if (ws.readyState === WebSocket.CONNECTING) {
+            addSystemMessage('Still connecting to AI... please wait a moment.');
+        }
         return;
     }
 
-    addUserMessage(text);
     ws.send(JSON.stringify({
         type: 'text_message',
         text: text,
     }));
+
+    addUserMessage(text);
     chatInput.value = '';
 }
 
@@ -407,6 +421,24 @@ function addSystemMessage(text) {
     div.innerHTML = `<p>${text}</p>`;
     chatMessages.appendChild(div);
     scrollChat();
+}
+
+function showTypingIndicator() {
+    if (document.querySelector('.typing-indicator')) return;
+    const div = document.createElement('div');
+    div.className = 'typing-indicator';
+    div.innerHTML = `
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+    `;
+    chatMessages.appendChild(div);
+    scrollChat();
+}
+
+function hideTypingIndicator() {
+    const el = document.querySelector('.typing-indicator');
+    if (el) el.remove();
 }
 
 function scrollChat() {

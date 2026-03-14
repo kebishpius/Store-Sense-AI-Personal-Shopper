@@ -1,0 +1,7 @@
+Sending test_image.jpg to http://localhost:8000/analyze...
+Status Code: 500
+Request failed with status code 500
+{"error":"404 Publisher Model `projects/hackathons-461900/locations/us-central1/publishers/google/models/gemini-1.5-flash-002` was not found or your project does not have access to it. Please ensure you are using a valid model version. For more information, see: https://cloud.google.com/vertex-ai/generative-ai/docs/learn/model-versions"}
+
+If you see a 500 error, please check the local uvicorn server logs 
+for Vertex AI API permission issues related to 'hackathons-461900'.
